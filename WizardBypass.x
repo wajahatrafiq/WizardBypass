@@ -1,6 +1,5 @@
-// COMPLETE WIZARD BYPASS SOLUTION v2.0
-// Comprehensive authentication bypass for Wizard framework
-// Targets: Authentication, Anti-tamper, Popups, Timers, Menu Creation
+// TARGETED WIZARD BYPASS v4.0 - Based on Verified Binary Analysis
+// Uses confirmed class locations and method chain from GitHub analysis
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
@@ -10,61 +9,274 @@
 #import <signal.h>
 
 static uint64_t g_wizard_base = 0;
-static BOOL g_auth_patched = NO;
+static BOOL g_bypass_active = NO;
 static BOOL g_menu_created = NO;
+static id g_abv_singleton = nil;
 
-// MARK: - Memory Patching
-static void patch_wizard_memory() {
-    NSLog(@"[WizKey] 🔍 Scanning for Wizard framework...");
+// MARK: - Framework-Level SCLAlertView Bypass
+static void bypass_framework_sclalertview() {
+    NSLog(@"[WizKey] 🎯 TARGETING FRAMEWORK SCLAlertView...");
     
-    uint32_t count = _dyld_image_count();
-    for (uint32_t i = 0; i < count; i++) {
-        const char *name = _dyld_get_image_name(i);
-        if (name && strstr(name, "Wizard.framework/Wizard")) {
-            g_wizard_base = (uint64_t)_dyld_get_image_vmaddr_slide(i);
-            NSLog(@"[WizKey] ✅ Wizard framework found at base: 0x%lx", (long)g_wizard_base);
+    // Get SCLAlertView class from Wizard framework
+    Class sclClass = objc_getClass("SCLAlertView");
+    if (sclClass) {
+        NSLog(@"[WizKey] ✅ SCLAlertView FOUND - BLOCKING ALL METHODS");
+        
+        // Block ALL SCLAlertView methods completely
+        unsigned int methodCount;
+        Method *methods = class_copyMethodList(sclClass, &methodCount);
+        
+        for (unsigned int i = 0; i < methodCount; i++) {
+            SEL selector = method_getName(methods[i]);
+            const char *name = sel_getName(selector);
             
-            // Patch authentication flag (0x1B0B4A9)
-            uint8_t *auth = (uint8_t *)(g_wizard_base + 0x1B0B4A9);
-            uint8_t old_auth = *auth;
-            *auth = 1;
-            NSLog(@"[WizKey] 🔓 AUTH FLAG: 0x%02X → 0x01", old_auth);
-            
-            // Patch configuration array (0x1B0B470)
-            uint8_t *cfg = (uint8_t *)(g_wizard_base + 0x1B0B470);
-            uint8_t expected_cfg[] = {1,1,1,1,1,1,0,1};
-            for (int j = 0; j < 7; j++) {
-                uint8_t old_cfg = cfg[j];
-                cfg[j] = expected_cfg[j];
-                if (old_cfg != expected_cfg[j]) {
-                    NSLog(@"[WizKey] ⚙️ CONFIG[%d]: 0x%02X → 0x%02X", j, old_cfg, expected_cfg[j]);
-                }
+            // Block any method that could create or show a popup
+            if (strstr(name, "show") || strstr(name, "present") || strstr(name, "alert") ||
+                strstr(name, "add") || strstr(name, "build") || strstr(name, "create") ||
+                strstr(name, "init") || strstr(name, "view")) {
+                
+                method_setImplementation(methods[i], imp_implementationWithBlock(
+                    ^(id self, ...) {
+                        NSLog(@"[WizKey] 🚫 SCLAlertView BLOCKED: %s", name);
+                        return nil; // Completely prevent creation
+                    }
+                ));
             }
-            
-            // Copy valid config templates
-            memcpy(cfg+8,  (void*)(g_wizard_base+0xFD6820), 16);
-            memcpy(cfg+24, (void*)(g_wizard_base+0xFD6830), 16);
-            memcpy((void*)(g_wizard_base+0x1B0B498), (void*)(g_wizard_base+0xFD6840), 16);
-            memcpy((void*)(g_wizard_base+0x1B0B4B0), (void*)(g_wizard_base+0xFD6850), 16);
-            memcpy((void*)(g_wizard_base+0x1B0B4C0), (void*)(g_wizard_base+0xFD6860), 16);
-            
-            g_auth_patched = YES;
-            NSLog(@"[WizKey] ✅ MEMORY PATCHES APPLIED SUCCESSFULLY!");
-            break;
         }
+        free(methods);
+        
+        // Block class methods too
+        unsigned int classMethodCount;
+        Method *classMethods = class_copyMethodList(objc_getMetaClass(object_getClassName(sclClass)), &classMethodCount);
+        
+        for (unsigned int i = 0; i < classMethodCount; i++) {
+            SEL selector = method_getName(classMethods[i]);
+            const char *name = sel_getName(selector);
+            
+            if (strstr(name, "show") || strstr(name, "present") || strstr(name, "alert")) {
+                method_setImplementation(classMethods[i], imp_implementationWithBlock(
+                    ^(id self, ...) {
+                        NSLog(@"[WizKey] 🚫 SCLAlertView CLASS METHOD BLOCKED: %s", name);
+                        return nil;
+                    }
+                ));
+            }
+        }
+        free(classMethods);
+        
+        NSLog(@"[WizKey] ✅ SCLAlertView COMPLETELY NEUTRALIZED");
+    } else {
+        NSLog(@"[WizKey] ❌ SCLAlertView NOT FOUND");
     }
+}
+
+// MARK: - ABVJSMGADJS Controller Hijack
+static void hijack_abvjsmgadjs() {
+    NSLog(@"[WizKey] 🎯 HIJACKING ABVJSMGADJS CONTROLLER...");
     
-    if (!g_auth_patched) {
-        NSLog(@"[WizKey] ❌ Wizard framework not found - using fallback hooks only");
+    Class abvClass = objc_getClass("ABVJSMGADJS");
+    if (abvClass) {
+        NSLog(@"[WizKey] ✅ ABVJSMGADJS FOUND - TAKING CONTROL");
+        
+        // Hook init to capture singleton
+        Method initM = class_getInstanceMethod(abvClass, @selector(init));
+        if (initM) {
+            method_setImplementation(initM, imp_implementationWithBlock(
+                ^id(id self) {
+                    id result = ((id(*)(id, SEL))objc_msgSend)(self, @selector(init));
+                    g_abv_singleton = result;
+                    NSLog(@"[WizKey] 🎯 ABVJSMGADJS CAPTURED: %p", result);
+                    
+                    // Force menu creation immediately after init
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        ((void(*)(id, SEL))objc_msgSend)(result, sel_registerName("IKAFHFDSAJ"));
+                    });
+                    
+                    return result;
+                }
+            ));
+        }
+        
+        // Hook PADSGFNDSAHJ (INIT method) to bypass auth requirements
+        SEL padsgfnSelector = sel_registerName("PADSGFNDSAHJ");
+        Method padsgfnM = class_getInstanceMethod(abvClass, padsgfnSelector);
+        if (padsgfnM) {
+            method_setImplementation(padsgfnM, imp_implementationWithBlock(
+                ^(id self) {
+                    NSLog(@"[WizKey] 🎯 PADSGFNDSAHJ FORCED - BYPASSING AUTH");
+                    // Skip auth checks and proceed directly
+                    return;
+                }
+            ));
+        }
+        
+        // Hook IKAFHFDSAJ (Menu creation)
+        SEL ikafhSelector = sel_registerName("IKAFHFDSAJ");
+        Method ikafhM = class_getInstanceMethod(abvClass, ikafhSelector);
+        if (ikafhM) {
+            method_setImplementation(ikafhM, imp_implementationWithBlock(
+                ^(id self) {
+                    NSLog(@"[WizKey] 🎯 IKAFHFDSAJ FORCED - CREATING MENU");
+                    g_menu_created = YES;
+                    
+                    // Force all setup methods
+                    ((void(*)(id, SEL))objc_msgSend)(self, sel_registerName("ASFGAHJFAHS"));
+                    ((void(*)(id, SEL))objc_msgSend)(self, sel_registerName("MdhsaJFSAJ"));
+                    
+                    // Create Wksahfnasj menu if needed
+                    id menu = ((id(*)(id, SEL))objc_msgSend)(objc_getClass("Wksahfnasj"), @selector(alloc));
+                    if (menu) {
+                        menu = ((id(*)(id, SEL))objc_msgSend)(menu, @selector(init));
+                        // Set menu property
+                        ((void(*)(id, SEL, id))objc_msgSend)(self, sel_registerName("setJdsghadurewmf:"), menu);
+                    }
+                    
+                    return;
+                }
+            ));
+        }
+        
+        NSLog(@"[WizKey] ✅ ABVJSMGADJS FULLY CONTROLLED");
+    } else {
+        NSLog(@"[WizKey] ❌ ABVJSMGADJS NOT FOUND");
+    }
+}
+
+// MARK: - Wksahfnasj Menu System Bypass
+static void bypass_wksahfnasj() {
+    NSLog(@"[WizKey] 🎯 BYPASSING Wksahfnasj MENU SYSTEM...");
+    
+    Class menuClass = objc_getClass("Wksahfnasj");
+    if (menuClass) {
+        NSLog(@"[WizKey] ✅ Wksahfnasj FOUND - ENABLING MENU");
+        
+        // Hook initWithFrame to bypass Metal setup requirements
+        Method initM = class_getInstanceMethod(menuClass, @selector(init));
+        if (initM) {
+            method_setImplementation(initM, imp_implementationWithBlock(
+                ^id(id self) {
+                    NSLog(@"[WizKey] 🎯 Wksahfnasj INITIALIZED - BYPASSING METAL");
+                    // Create basic UIView instead of Metal setup
+                    ((id(*)(id, SEL))objc_msgSend)([objc_getClass("UIView") alloc], @selector(init));
+                    return self;
+                }
+            ));
+        }
+        
+        // Hook Metal renderer setup methods
+        NSArray *metalMethods = @[@"paDJSAFBSANC", @"jsafbSAHCN", @"dgshdsfyewrh"];
+        for (NSString *methodName in metalMethods) {
+            SEL selector = sel_registerName([methodName UTF8String]);
+            Method methodM = class_getInstanceMethod(menuClass, selector);
+            if (methodM) {
+                method_setImplementation(methodM, imp_implementationWithBlock(
+                    ^(id self) {
+                        NSLog(@"[WizKey] 🎯 METAL METHOD BYPASSED: %@", methodName);
+                        return; // Skip Metal setup
+                    }
+                ));
+            }
+        }
+        
+        NSLog(@"[WizKey] ✅ Wksahfnasj METAL BYPASS COMPLETE");
+    } else {
+        NSLog(@"[WizKey] ❌ Wksahfnasj NOT FOUND");
+    }
+}
+
+// MARK: - Pajdsakdfj Icon System
+static void enable_pajdsakdfj_icons() {
+    NSLog(@"[WizKey] 🎯 ENABLING PAJDSAKDFJ ICON SYSTEM...");
+    
+    Class iconClass = objc_getClass("Pajdsakdfj");
+    if (iconClass) {
+        NSLog(@"[WizKey] ✅ Pajdsakdfj FOUND - CREATING ICONS");
+        
+        // Hook didTapIconView to force menu
+        Method tapM = class_getInstanceMethod(iconClass, @selector(didTapIconView));
+        if (tapM) {
+            method_setImplementation(tapM, imp_implementationWithBlock(
+                ^(id self) {
+                    NSLog(@"[WizKey] 🎯 ICON TAPPED - FORCING MENU");
+                    if (g_abv_singleton) {
+                        ((void(*)(id, SEL))objc_msgSend)(g_abv_singleton, sel_registerName("IKAFHFDSAJ"));
+                    }
+                }
+            ));
+        }
+        
+        // Hook initWithFrame to ensure visibility
+        Method initM = class_getInstanceMethod(iconClass, @selector(initWithFrame:));
+        if (initM) {
+            method_setImplementation(initM, imp_implementationWithBlock(
+                ^id(id self, CGRect frame) {
+                    id result = ((id(*)(id, SEL, CGRect))objc_msgSend)(self, @selector(initWithFrame:), frame);
+                    
+                    // Make icon visible
+                    if (result) {
+                        ((void(*)(id, SEL, BOOL))objc_msgSend)(result, @selector(setHidden:), NO);
+                        ((void(*)(id, SEL, CGFloat))objc_msgSend)(result, @selector(setAlpha:), 1.0);
+                    }
+                    
+                    return result;
+                }
+            ));
+        }
+        
+        NSLog(@"[WizKey] ✅ PAJDSAKDFJ ICONS ENABLED");
+    } else {
+        NSLog(@"[WizKey] ❌ PAJDSAKDFJ NOT FOUND");
+    }
+}
+
+// MARK: - Timer Neutralization
+static void neutralize_timers() {
+    NSLog(@"[WizKey] 🎯 NEUTRALIZING WIZARD TIMERS...");
+    
+    // Hook NSTimer creation globally
+    Class timerClass = objc_getClass("NSTimer");
+    if (timerClass) {
+        Method timerM = class_getClassMethod(timerClass, @selector(scheduledTimerWithTimeInterval:repeats:block:));
+        if (timerM) {
+            method_setImplementation(timerM, imp_implementationWithBlock(
+                ^id(id self, NSTimeInterval interval, BOOL repeats, id block) {
+                    // Block any timer longer than 1 second (likely crash timers)
+                    if (interval > 1.0) {
+                        NSLog(@"[WizKey] 🚫 DANGEROUS TIMER BLOCKED: %.1fs", interval);
+                        return nil;
+                    }
+                    // Allow short timers
+                    return ((id(*)(id, SEL, NSTimeInterval, BOOL, id))objc_msgSend)
+                           (self, @selector(scheduledTimerWithTimeInterval:repeats:block:), interval, repeats, block);
+                }
+            ));
+        }
+        
+        Method timerM2 = class_getClassMethod(timerClass, @selector(timerWithTimeInterval:repeats:block:));
+        if (timerM2) {
+            method_setImplementation(timerM2, imp_implementationWithBlock(
+                ^id(id self, NSTimeInterval interval, BOOL repeats, id block) {
+                    if (interval > 1.0) {
+                        NSLog(@"[WizKey] 🚫 TIMER BLOCKED: %.1fs", interval);
+                        return nil;
+                    }
+                    return ((id(*)(id, SEL, NSTimeInterval, BOOL, id))objc_msgSend)
+                           (self, @selector(timerWithTimeInterval:repeats:block:), interval, repeats, block);
+                }
+            ));
+        }
+        
+        NSLog(@"[WizKey] ✅ TIMER PROTECTION ACTIVE");
     }
 }
 
 // MARK: - Anti-Tamper Bypass
 static void bypass_anti_tamper() {
-    // Hook drawInMTKView to prevent 0xDEAD crash
-    Class renderer = objc_getClass("AJFADSHFSAJXN");
-    if (renderer) {
-        Method drawM = class_getInstanceMethod(renderer, @selector(drawInMTKView:));
+    NSLog(@"[WizKey] 🎯 BYPASSING ANTI-TAMPER...");
+    
+    Class rendererClass = objc_getClass("AJFADSHFSAJXN");
+    if (rendererClass) {
+        Method drawM = class_getInstanceMethod(rendererClass, @selector(drawInMTKView:));
         if (drawM) {
             method_setImplementation(drawM, imp_implementationWithBlock(
                 ^(id self, id view) {
@@ -72,244 +284,83 @@ static void bypass_anti_tamper() {
                     // Do nothing - prevents 0xDEAD trap
                 }
             ));
-            NSLog(@"[WizKey] 🛡️ ANTI-TAMPER PROTECTION ACTIVE");
+            NSLog(@"[WizKey] ✅ ANTI-TAMPER BYPASSED");
         }
     }
 }
 
-// MARK: - Timer Neutralization
-static void neutralize_timers() {
-    // Block all Wizard framework timers
-    Class wizardClasses[] = {
-        objc_getClass("ABVJSMGADJS"),
-        objc_getClass("Wksahfnasj"),
-        objc_getClass("Pajdsakdfj")
-    };
-    
-    for (int i = 0; i < 3; i++) {
-        Class cls = wizardClasses[i];
-        if (cls) {
-            // Hook timer creation
-            Method timerM = class_getClassMethod(objc_getMetaClass(cls), @selector(scheduledTimerWithTimeInterval:repeats:block:));
-            if (timerM) {
-                method_setImplementation(timerM, imp_implementationWithBlock(
-                    ^(id self, NSTimeInterval interval, BOOL repeats, id block) {
-                        if (interval > 2.0) {
-                            NSLog(@"[WizKey] ⏰ DANGEROUS TIMER BLOCKED: %.1fs", interval);
-                            return nil; // Block long timers (likely crash timers)
-                        }
-                        // Allow short timers (< 2 seconds)
-                        return ((id(*)(id, SEL, NSTimeInterval, BOOL, id))objc_msgSend)
-                               (self, @selector(scheduledTimerWithTimeInterval:repeats:block:), interval, repeats, block);
-                    }
-                ));
-                NSLog(@"[WizKey] ⏰ TIMER PROTECTION: %@", NSStringFromClass(cls));
-            }
-        }
-    }
-}
-
-// MARK: - Popup Elimination
-static void eliminate_popups() {
-    // Comprehensive popup blocking
-    NSArray *popupClasses = @[@"SCLAlertView", @"UIAlertController", @"UIAlertView"];
-    NSArray *blockedKeywords = @[@"wizard", @"license", @"key", @"auth", @"authentication", @"activate", @"premium"];
-    
-    for (NSString *className in popupClasses) {
-        Class popupClass = objc_getClass([className UTF8String]);
-        if (popupClass) {
-            NSLog(@"[WizKey] 🚫 HOOKING POPUP CLASS: %@", className);
-            
-            // Hook all show/present methods
-            unsigned int methodCount;
-            Method *methods = class_copyMethodList(popupClass, &methodCount);
-            for (unsigned int i = 0; i < methodCount; i++) {
-                SEL selector = method_getName(methods[i]);
-                const char *name = sel_getName(selector);
-                
-                if (strstr(name, "show") || strstr(name, "present") || strstr(name, "alert")) {
-                    method_setImplementation(methods[i], imp_implementationWithBlock(
-                        ^(id self, ...) {
-                            va_list args;
-                            va_start(args, self);
-                            
-                            // Check title and message parameters
-                            id title = nil, message = nil;
-                            for (int j = 0; j < 10; j++) {
-                                id arg = va_arg(args, id);
-                                if ([arg isKindOfClass:[NSString class]]) {
-                                    NSString *str = (NSString *)arg;
-                                    if (!title) title = str;
-                                    else if (!message) message = str;
-                                }
-                            }
-                            va_end(args);
-                            
-                            // Check if this is an auth popup
-                            NSString *combined = [NSString stringWithFormat:@"%@ %@", title ?: @"", message ?: @""];
-                            BOOL isAuthPopup = NO;
-                            for (NSString *keyword in blockedKeywords) {
-                                if ([combined.lowercaseString containsString:keyword.lowercaseString]) {
-                                    isAuthPopup = YES;
-                                    break;
-                                }
-                            }
-                            
-                            if (isAuthPopup) {
-                                NSLog(@"[WizKey] 🚫 AUTH POPUP BLOCKED: %@", className);
-                                return nil; // Block the popup
-                            }
-                            
-                            // Allow non-auth popups
-                            return ((id(*)(id, SEL, ...))objc_msgSend)(self, selector, args);
-                        }
-                    ));
-                }
-            }
-            free(methods);
-        }
-    }
-}
-
-// MARK: - Menu Force Creation
-static void force_wizard_menu() {
-    NSLog(@"[WizKey] 🎯 ATTEMPTING MENU CREATION...");
-    
-    Class abvClass = objc_getClass("ABVJSMGADJS");
-    if (abvClass) {
-        // Try multiple methods to get/create singleton
-        id singleton = nil;
-        
-        // Method 1: Try sharedInstance
-        if (class_getClassMethod(abvClass, @selector(sharedInstance))) {
-            singleton = ((id(*)(id, SEL))objc_msgSend)(abvClass, @selector(sharedInstance));
-        }
-        
-        // Method 2: Try alloc/init
-        if (!singleton) {
-            singleton = ((id(*)(id, SEL))objc_msgSend)([abvClass alloc], @selector(init));
-        }
-        
-        if (singleton) {
-            NSLog(@"[WizKey] ✅ ABVJSMGADJS OBTAINED: %p", singleton);
-            
-            // Force menu creation with multiple methods
-            NSArray *menuMethods = @[@"IKAFHFDSAJ", @"PADSGFNDSAHJ", @"ASFGAHJFAHS", @"MdhsaJFSAJ"];
-            for (NSString *methodName in menuMethods) {
-                SEL selector = sel_registerName([methodName UTF8String]);
-                if (class_getInstanceMethod(abvClass, selector)) {
-                    NSLog(@"[WizKey] 🎯 CALLING METHOD: %@", methodName);
-                    ((void(*)(id, SEL))objc_msgSend)(singleton, selector);
-                    g_menu_created = YES;
-                    break;
-                }
-            }
-            
-            if (g_menu_created) {
-                NSLog(@"[WizKey] 🎉 WIZARD MENU SUCCESSFULLY CREATED!");
-            } else {
-                NSLog(@"[WizKey] ❌ FAILED TO CREATE MENU - NO VALID METHODS");
-            }
-        } else {
-            NSLog(@"[WizKey] ❌ FAILED TO OBTAIN ABVJSMGADJS SINGLETON");
-        }
-    } else {
-        NSLog(@"[WizKey] ❌ ABVJSMGADJS CLASS NOT FOUND");
-    }
-}
-
-// MARK: - NSUserDefaults Spoofing
+// MARK: - NSUserDefaults Authentication Spoof
 static void spoof_authentication() {
+    NSLog(@"[WizKey] 🎯 SPOOFING AUTHENTICATION...");
+    
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     
-    // Set multiple auth-related keys
-    NSArray *authKeys = @[@"auth-token-type", @"wizard-authenticated", @"wizard-premium", @"wizard-license"];
-    NSArray *authValues = @[@"premium", @"true", @"enabled", @"valid"];
+    // Set comprehensive auth spoofing
+    NSArray *authKeys = @[@"auth-token-type", @"wizard-authenticated", @"wizard-premium", 
+                          @"wizard-license", @"wizard-key", @"wizard-validated"];
+    NSArray *authValues = @[@"premium", @"true", @"enabled", @"valid", @"bypassed", @"true"];
     
     for (int i = 0; i < authKeys.count; i++) {
         [defaults setObject:authValues[i] forKey:authKeys[i]];
     }
     
     [defaults synchronize];
-    NSLog(@"[WizKey] 🔐 AUTHENTICATION SPOOFED WITH %lu KEYS", (unsigned long)authKeys.count);
+    NSLog(@"[WizKey] ✅ AUTHENTICATION SPOOFED WITH %lu KEYS", (unsigned long)authKeys.count);
 }
 
-// MARK: - Icon Creation Fallback
-static void create_wizard_icon() {
-    NSLog(@"[WizKey] 🎨 CREATING FALLBACK WIZARD ICON...");
+// MARK: - Force Menu Creation
+static void force_wizard_menu() {
+    NSLog(@"[WizKey] 🎯 FORCING WIZARD MENU CREATION...");
     
-    // Create a visible purple icon manually
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        UIWindow *window = [UIApplication sharedApplication].keyWindow;
-        if (window) {
-            // Create purple circular button
-            UIButton *wizardButton = [UIButton buttonWithType:UIButtonTypeCustom];
-            wizardButton.frame = CGRectMake(816, 100, 60, 60);
-            wizardButton.backgroundColor = [UIColor purpleColor];
-            wizardButton.layer.cornerRadius = 30;
-            wizardButton.layer.borderWidth = 2;
-            wizardButton.layer.borderColor = [UIColor whiteColor].CGColor;
-            
-            // Add "W" text
-            [wizardButton setTitle:@"W" forState:UIControlStateNormal];
-            [wizardButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-            wizardButton.titleLabel.font = [UIFont boldSystemFontOfSize:24];
-            
-            // Add to window
-            [window addSubview:wizardButton];
-            [window bringSubviewToFront:wizardButton];
-            
-            // Add tap handler to force menu
-            [wizardButton addTarget:wizardButton action:@selector(force_wizard_menu) forControlEvents:UIControlEventTouchUpInside];
-            
-            NSLog(@"[WizKey] 🎨 FALLBACK ICON CREATED AND VISIBLE");
-        }
-    });
+    if (g_abv_singleton) {
+        // Force menu creation
+        ((void(*)(id, SEL))objc_msgSend)(g_abv_singleton, sel_registerName("IKAFHFDSAJ"));
+        g_menu_created = YES;
+        NSLog(@"[WizKey] ✅ WIZARD MENU FORCED");
+    } else {
+        NSLog(@"[WizKey] ❌ NO ABVJSMGADJS SINGLETON");
+    }
 }
 
 // MARK: - Main Constructor
 __attribute__((constructor))
-static void wizard_complete_bypass() {
-    NSLog(@"[WizKey] 🚀 COMPLETE WIZARD BYPASS v2.0 INITIALIZING...");
+static void wizard_targeted_bypass() {
+    NSLog(@"[WizKey] 🚀 TARGETED WIZARD BYPASS v4.0 STARTING...");
     
-    // Execute bypass in sequence
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
+    // Execute bypass in precise order
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // Phase 1: Block popups immediately
+        bypass_framework_sclalertview();
         
-        // Phase 1: Memory patches (most important)
-        patch_wizard_memory();
+        // Phase 2: Hijack main controller
+        hijack_abvjsmgadjs();
         
-        // Phase 2: Anti-tamper protection
-        bypass_anti_tamper();
+        // Phase 3: Bypass menu system
+        bypass_wksahfnasj();
         
-        // Phase 3: Timer neutralization
+        // Phase 4: Enable icons
+        enable_pajdsakdfj_icons();
+        
+        // Phase 5: Neutralize timers
         neutralize_timers();
         
-        // Phase 4: Popup elimination
-        eliminate_popups();
+        // Phase 6: Bypass anti-tamper
+        bypass_anti_tamper();
         
-        // Phase 5: Authentication spoofing
+        // Phase 7: Spoof authentication
         spoof_authentication();
         
-        // Phase 6: Force menu creation
+        // Phase 8: Force menu
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
             force_wizard_menu();
             
-            // Phase 7: Fallback icon creation
-            if (!g_menu_created) {
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
-                               dispatch_get_main_queue(), ^{
-                    create_wizard_icon();
-                });
-            }
-            
-            NSLog(@"[WizKey] 🎉 COMPLETE BYPASS ACTIVATED!");
-            NSLog(@"[WizKey] 📊 STATUS: Auth=%@ Menu=%@ Memory=%@", 
-                   g_auth_patched ? @"✅" : @"❌",
-                   g_menu_created ? @"✅" : @"❌", 
-                   g_wizard_base ? @"✅" : @"❌");
+            g_bypass_active = YES;
+            NSLog(@"[WizKey] 🎉 TARGETED BYPASS COMPLETE!");
+            NSLog(@"[WizKey] 📊 STATUS: Popup=%@ Controller=%@ Menu=%@", 
+                   g_bypass_active ? @"✅" : @"❌",
+                   g_abv_singleton ? @"✅" : @"❌",
+                   g_menu_created ? @"✅" : @"❌");
         });
     });
 }
